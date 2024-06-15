@@ -13,8 +13,8 @@ let
     sha256Hash = "sha256-2PqOz+QVtEUTNQkBUB4qD0KcoDPPGAUFSxyBbEpwRWU=";
   };
   betaVersion = {
-    version = "2024.1.1.10"; # "Android Studio Koala | 2024.1.1 RC 2"
-    sha256Hash = "sha256-84CpZfoAvJHUCO3ZBJqDbuz9xuGE/5xJfXoetJDXju8=";
+    version = "2024.1.1.11"; # "Android Studio Koala | 2024.1.1"
+    sha256Hash = "sha256-2PqOz+QVtEUTNQkBUB4qD0KcoDPPGAUFSxyBbEpwRWU=";
   };
   latestVersion = {
     version = "2024.1.2.7"; # "Android Studio Koala Feature Drop | 2024.1.2 Canary 7"
