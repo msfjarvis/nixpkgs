@@ -10613,6 +10613,8 @@ self: super: with self; {
 
   mediafile = callPackage ../development/python-modules/mediafile { };
 
+  mediafire = callPackage ../development/python-modules/mediafire { };
+
   mediapy = callPackage ../development/python-modules/mediapy { };
 
   mediawiki-langcodes = callPackage ../development/python-modules/mediawiki-langcodes { };
