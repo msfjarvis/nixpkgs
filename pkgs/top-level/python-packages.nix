@@ -966,6 +966,10 @@ self: super: with self; {
 
   asyncpg = callPackage ../development/python-modules/asyncpg { };
 
+  asyncpraw = callPackage ../development/python-modules/asyncpraw { };
+
+  asyncprawcore = callPackage ../development/python-modules/asyncprawcore { };
+
   asyncserial = callPackage ../development/python-modules/asyncserial { };
 
   asyncsleepiq = callPackage ../development/python-modules/asyncsleepiq { };
@@ -15720,6 +15724,8 @@ self: super: with self; {
   sphinxcontrib-spelling = callPackage ../development/python-modules/sphinxcontrib-spelling { };
 
   sphinxcontrib-tikz = callPackage ../development/python-modules/sphinxcontrib-tikz { };
+
+  sphinxcontrib-trio = callPackage ../development/python-modules/sphinxcontrib-trio { };
 
   sphinxcontrib-wavedrom = callPackage ../development/python-modules/sphinxcontrib-wavedrom { };
 
