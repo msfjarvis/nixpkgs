@@ -9706,6 +9706,8 @@ self: super: with self; {
 
   myhome = callPackage ../development/python-modules/myhome { };
 
+  myjdapi = callPackage ../development/python-modules/myjdapi { };
+
   myjwt = callPackage ../development/python-modules/myjwt { };
 
   mypermobil = callPackage ../development/python-modules/mypermobil { };
