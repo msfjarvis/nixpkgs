@@ -1,0 +1,16 @@
+diff --git a/setup.py b/setup.py
+index 4792b6279f21..8e9de6378f9c 100644
+--- a/setup.py
++++ b/setup.py
+@@ -63,9 +63,9 @@ setup(
+     ),
+     extras_require=extras,
+     install_requires=[
+-        "aiofiles <1",
++        "aiofiles",
+         "aiohttp <4",
+-        "aiosqlite <=0.17.0",
++        "aiosqlite",
+         "asyncprawcore >=2.1, <3",
+         "update_checker >=0.18",
+     ],
