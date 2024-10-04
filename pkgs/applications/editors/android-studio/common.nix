@@ -90,6 +90,8 @@ let
 
     # Causes the shebangs in interpreter scripts deployed to mobile devices to be patched, which Android does not understand
     dontPatchShebangs = true;
+    # This is faster to fetch from Google and patch than fetch from any other network service.
+    allowSubstitutes = false;
 
     installPhase = ''
       cp -r . $out
