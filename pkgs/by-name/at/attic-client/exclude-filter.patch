@@ -1,0 +1,280 @@
+From 4780543b7ffc8387eba3f2344e13207a11f7e8eb Mon Sep 17 00:00:00 2001
+From: shimun <shimun@shimun.net>
+Date: Mon, 17 Jul 2023 15:00:23 +0200
+Subject: [PATCH] feat(push): filter derivation by regex
+
+---
+ attic/src/nix_store/nix_store.rs  | 25 ++++++++++++++++++-------
+ attic/src/nix_store/tests/mod.rs  |  4 ++--
+ client/src/command/get_closure.rs | 12 +++++++++++-
+ client/src/command/push.rs        | 14 +++++++++++++-
+ client/src/push.rs                | 18 ++++++++++++++----
+ 5 files changed, 58 insertions(+), 15 deletions(-)
+
+diff --git a/attic/src/nix_store/nix_store.rs b/attic/src/nix_store/nix_store.rs
+index 3b754f9c84fe..d43a44484eff 100644
+--- a/attic/src/nix_store/nix_store.rs
++++ b/attic/src/nix_store/nix_store.rs
+@@ -5,6 +5,7 @@ use std::os::unix::ffi::OsStrExt;
+ use std::path::{Path, PathBuf};
+ use std::sync::Arc;
+ 
++use regex::Regex;
+ use tokio::task::spawn_blocking;
+ 
+ use super::bindings::{open_nix_store, AsyncWriteAdapter, FfiNixStore};
+@@ -113,6 +114,7 @@ impl NixStore {
+         flip_directions: bool,
+         include_outputs: bool,
+         include_derivers: bool,
++        filter: Option<Regex>,
+     ) -> AtticResult<Vec<StorePath>> {
+         let inner = self.inner.clone();
+ 
+@@ -128,16 +130,20 @@ impl NixStore {
+ 
+             Ok(cxx_vector
+                 .iter()
+-                .map(|s| {
++                .flat_map(|s| {
+                     let osstr = OsStr::from_bytes(s.as_bytes());
+                     let pb = PathBuf::from(osstr);
+ 
+                     // Safety: The C++ implementation already checks the StorePath
+                     // for correct format (which also implies valid UTF-8)
+                     #[allow(unsafe_code)]
+-                    unsafe {
+-                        StorePath::from_base_name_unchecked(pb)
+-                    }
++                    let store_path = unsafe { StorePath::from_base_name_unchecked(pb) };
++                    if let Some(ref filter) = filter {
++                        if filter.is_match(&store_path.name()) {
++                            return None;
++                        }
++                    };
++                    Some(store_path)
+                 })
+                 .collect())
+         })
+@@ -156,6 +162,7 @@ impl NixStore {
+         flip_directions: bool,
+         include_outputs: bool,
+         include_derivers: bool,
++        filter: Option<Regex>,
+     ) -> AtticResult<Vec<StorePath>> {
+         let inner = self.inner.clone();
+ 
+@@ -174,16 +181,20 @@ impl NixStore {
+ 
+             Ok(cxx_vector
+                 .iter()
+-                .map(|s| {
++                .filter_map(|s| {
+                     let osstr = OsStr::from_bytes(s.as_bytes());
+                     let pb = PathBuf::from(osstr);
+ 
+                     // Safety: The C++ implementation already checks the StorePath
+                     // for correct format (which also implies valid UTF-8)
+                     #[allow(unsafe_code)]
+-                    unsafe {
+-                        StorePath::from_base_name_unchecked(pb)
++                    let store_path = unsafe { StorePath::from_base_name_unchecked(pb) };
++                    if let Some(ref filter) = filter {
++                        if filter.is_match(&store_path.name()) {
++                            return None;
++                        }
+                     }
++                    Some(store_path)
+                 })
+                 .collect())
+         })
+diff --git a/attic/src/nix_store/tests/mod.rs b/attic/src/nix_store/tests/mod.rs
+index ac5e2f970175..ed72520f472e 100644
+--- a/attic/src/nix_store/tests/mod.rs
++++ b/attic/src/nix_store/tests/mod.rs
+@@ -177,7 +177,7 @@ async fn test_compute_fs_closure() {
+             .expect("Could not parse store path");
+ 
+         let actual: HashSet<StorePath> = store
+-            .compute_fs_closure(path, false, false, false)
++            .compute_fs_closure(path, false, false, false, None)
+             .await
+             .expect("Could not compute closure")
+             .into_iter()
+@@ -206,7 +206,7 @@ async fn test_compute_fs_closure_multi() {
+     ];
+ 
+     let actual: HashSet<StorePath> = store
+-        .compute_fs_closure_multi(paths, false, false, false)
++        .compute_fs_closure_multi(paths, false, false, false, None)
+         .await
+         .expect("Could not compute closure")
+         .into_iter()
+diff --git a/client/src/command/get_closure.rs b/client/src/command/get_closure.rs
+index 8fb5fe4adf47..797e4269cf59 100644
+--- a/client/src/command/get_closure.rs
++++ b/client/src/command/get_closure.rs
+@@ -2,6 +2,7 @@ use std::path::PathBuf;
+ 
+ use anyhow::Result;
+ use clap::Parser;
++use regex::Regex;
+ 
+ use crate::cli::Opts;
+ use attic::nix_store::NixStore;
+@@ -16,6 +17,9 @@ pub struct GetClosure {
+     /// For derivations, include their outputs.
+     #[clap(long)]
+     include_outputs: bool,
++
++    #[clap(long)]
++    filter: Option<Regex>,
+ }
+ 
+ pub async fn run(opts: Opts) -> Result<()> {
+@@ -24,7 +28,13 @@ pub async fn run(opts: Opts) -> Result<()> {
+     let store = NixStore::connect()?;
+     let store_path = store.follow_store_path(&sub.store_path)?;
+     let closure = store
+-        .compute_fs_closure(store_path, false, sub.include_outputs, false)
++        .compute_fs_closure(
++            store_path,
++            false,
++            sub.include_outputs,
++            false,
++            sub.filter.clone(),
++        )
+         .await?;
+ 
+     for path in &closure {
+diff --git a/client/src/command/push.rs b/client/src/command/push.rs
+index b2bb661f7041..7d3a6d99cc6b 100644
+--- a/client/src/command/push.rs
++++ b/client/src/command/push.rs
+@@ -5,6 +5,7 @@ use std::sync::Arc;
+ use anyhow::{anyhow, Result};
+ use clap::Parser;
+ use indicatif::MultiProgress;
++use regex::Regex;
+ use tokio::io::{self, AsyncBufReadExt, BufReader};
+ 
+ use crate::api::ApiClient;
+@@ -26,6 +27,10 @@ pub struct Push {
+     /// The store paths to push.
+     paths: Vec<PathBuf>,
+ 
++    /// Derivation names to be filtered out.
++    #[clap(long)]
++    filter: Option<Regex>,
++
+     /// Read paths from the standard input.
+     #[clap(long)]
+     stdin: bool,
+@@ -54,6 +59,7 @@ struct PushContext {
+     pusher: Pusher,
+     no_closure: bool,
+     ignore_upstream_cache_filter: bool,
++    filter: Option<Regex>,
+ }
+ 
+ impl PushContext {
+@@ -75,7 +81,12 @@ impl PushContext {
+ 
+         let plan = self
+             .pusher
+-            .plan(roots, self.no_closure, self.ignore_upstream_cache_filter)
++            .plan(
++                roots,
++                self.no_closure,
++                self.ignore_upstream_cache_filter,
++                self.filter.clone(),
++            )
+             .await?;
+ 
+         if plan.store_path_map.is_empty() {
+@@ -179,6 +190,7 @@ pub async fn run(opts: Opts) -> Result<()> {
+         pusher,
+         no_closure: sub.no_closure,
+         ignore_upstream_cache_filter: sub.ignore_upstream_cache_filter,
++        filter: sub.filter.clone(),
+     };
+ 
+     if sub.stdin {
+diff --git a/client/src/push.rs b/client/src/push.rs
+index 309bd4b620f6..23d1af5428a2 100644
+--- a/client/src/push.rs
++++ b/client/src/push.rs
+@@ -28,6 +28,7 @@ use bytes::Bytes;
+ use futures::future::join_all;
+ use futures::stream::{Stream, TryStreamExt};
+ use indicatif::{HumanBytes, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
++use regex::Regex;
+ use tokio::sync::{mpsc, Mutex};
+ use tokio::task::{spawn, JoinHandle};
+ use tokio::time;
+@@ -203,6 +204,7 @@ impl Pusher {
+         roots: Vec<StorePath>,
+         no_closure: bool,
+         ignore_upstream_filter: bool,
++        filter: Option<Regex>,
+     ) -> Result<PushPlan> {
+         PushPlan::plan(
+             self.store.clone(),
+@@ -212,6 +214,7 @@ impl Pusher {
+             roots,
+             no_closure,
+             ignore_upstream_filter,
++            filter,
+         )
+         .await
+     }
+@@ -349,6 +352,7 @@ impl PushSession {
+                     roots_vec,
+                     config.no_closure,
+                     config.ignore_upstream_cache_filter,
++                    None,
+                 )
+                 .await?;
+ 
+@@ -410,28 +414,34 @@ impl PushPlan {
+         roots: Vec<StorePath>,
+         no_closure: bool,
+         ignore_upstream_filter: bool,
++        filter: Option<Regex>,
+     ) -> Result<Self> {
+         // Compute closure
+         let closure = if no_closure {
+             roots
+         } else {
+             store
+-                .compute_fs_closure_multi(roots, false, false, false)
++                .compute_fs_closure_multi(roots, false, false, false, None)
+                 .await?
+         };
+ 
+         let mut store_path_map: HashMap<StorePathHash, ValidPathInfo> = {
+             let futures = closure
+                 .iter()
+-                .map(|path| {
++                .flat_map(|path| {
+                     let store = store.clone();
+                     let path = path.clone();
++                    if let Some(ref filter) = filter {
++                        if filter.is_match(&path.name()) {
++                            return None;
++                        }
++                    }
+                     let path_hash = path.to_hash();
+ 
+-                    async move {
++                    Some(async move {
+                         let path_info = store.query_path_info(path).await?;
+                         Ok((path_hash, path_info))
+-                    }
++                    })
+                 })
+                 .collect::<Vec<_>>();
+ 
+-- 
+2.46.0
+
