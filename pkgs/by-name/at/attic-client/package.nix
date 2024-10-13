@@ -26,6 +26,8 @@ rustPlatform.buildRustPackage {
     hash = "sha256-V0EPQNsQko1a8OqIWc2lLviLnMpR1m08Ej00z5RVTfs=";
   };
 
+  patches = [ ./exclude-filter.patch ];
+
   nativeBuildInputs = [
     pkg-config
     installShellFiles
