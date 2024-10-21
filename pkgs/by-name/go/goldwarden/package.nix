@@ -1,5 +1,6 @@
 {
   lib,
+  stdenv,
   blueprint-compiler,
   buildGoModule,
   fetchFromGitHub,
@@ -10,6 +11,7 @@
   libnotify,
   python3,
   wrapGAppsHook4,
+  installShellFiles,
 }:
 
 buildGoModule rec {
@@ -51,6 +53,7 @@ buildGoModule rec {
     gobject-introspection
     python3.pkgs.wrapPython
     wrapGAppsHook4
+    installShellFiles
   ];
 
   buildInputs = [
@@ -84,6 +87,11 @@ buildGoModule rec {
     install -D cli/browserbiometrics/chrome-com.8bit.bitwarden.json $out/etc/chromium/native-messaging-hosts/com.8bit.bitwarden.json
     install -D cli/browserbiometrics/chrome-com.8bit.bitwarden.json $out/etc/edge/native-messaging-hosts/com.8bit.bitwarden.json
     install -D cli/browserbiometrics/mozilla-com.8bit.bitwarden.json $out/lib/mozilla/native-messaging-hosts/com.8bit.bitwarden.json
+  '' + lib.optionalString (stdenv.buildPlatform.canExecute stdenv.hostPlatform) ''
+    installShellCompletion --cmd goldwarden \
+      --bash <($out/bin/goldwarden completion bash) \
+      --fish <($out/bin/goldwarden completion fish) \
+      --zsh <($out/bin/goldwarden completion zsh)
   '';
 
   dontWrapGApps = true;
