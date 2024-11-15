@@ -107,6 +107,12 @@ lib.trivial.pipe super [
     ];
   }))
 
+  (patchExtension "another-window-session-manager@gmail.com" (old: {
+    patches = [
+      ./extensionOverridesPatches/another_window_session_manager_at_gmail_com.patch
+    ];
+  }))
+
   (patchExtension "freon@UshakovVasilii_Github.yahoo.com" (old: {
     patches = [
       (replaceVars ./extensionOverridesPatches/freon_at_UshakovVasilii_Github.yahoo.com.patch {
