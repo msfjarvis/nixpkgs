@@ -1,0 +1,15 @@
+diff --git a/metadata.json b/metadata.json
+index e7378823c936..5de84a9a30c7 100644
+--- a/metadata.json
++++ b/metadata.json
+@@ -4,9 +4,10 @@
+   "name": "Another Window Session Manager",
+   "shell-version": [
+     "45",
+-    "46"
++    "46",
++    "47"
+   ],
+   "url": "https://github.com/nlpsuge/gnome-shell-extension-another-window-session-manager",
+   "uuid": "another-window-session-manager@gmail.com",
+   "version": 49
