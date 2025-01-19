@@ -142,8 +142,8 @@ stdenv.mkDerivation (finalAttrs: {
     moveToOutput share/terminfo $terminfo
     ln -s $terminfo/share/terminfo $out/share/terminfo
 
-    mv $out/share/ghostty/shell-integration $shell_integration
-    ln -s $shell_integration $out/share/ghostty/shell-integration
+    mv $out/share/ghostty $shell_integration
+    ln -s $shell_integration $out/share/ghostty
 
     mv $out/share/vim/vimfiles $vim
     rmdir $out/share/vim
