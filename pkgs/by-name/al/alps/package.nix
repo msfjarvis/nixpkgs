@@ -8,30 +8,22 @@
 
 buildGoModule {
   pname = "alps";
-  version = "2022-10-18";
+  version = "0-unstable-2025-11-26";
 
   src = fetchFromSourcehut {
     owner = "~migadu";
     repo = "alps";
-    rev = "f01fbcbc48db5e65d69a0ebd9d7cb0deb378cf13";
-    hash = "sha256-RSug3YSiqYLGs05Bee4NoaoCyPvUZ7IqlKWI1hmxbiA=";
+    rev = "bd6a860d88e9ee02fc051f8596b042e7381b38fa";
+    hash = "sha256-btrZp95Lts6wyO3kL5fppeCrtrGP9/s0x0ZAJL1D9ik=";
   };
 
-  vendorHash = "sha256-QsGfINktk+rBj4b5h+NBVS6XV1SVz+9fDL1vtUqcKEU=";
+  vendorHash = "sha256-dxmuxXnQVIFl7jdEn8tMfE/5QsdHmgujDHm53a+bxoE=";
 
   ldflags = [
     "-s"
     "-w"
     "-X main.themesPath=${placeholder "out"}/share/alps/themes"
     "-X git.sr.ht/~migadu/alps.PluginDir=${placeholder "out"}/share/alps/plugins"
-  ];
-
-  patches = [
-    (fetchpatch {
-      name = "Issue-160-Alps-theme-has-a-enormous-move-to-list-sel";
-      url = "https://lists.sr.ht/~migadu/alps-devel/patches/30096/mbox";
-      hash = "sha256-Sz/SCkrrXZWrmJzjfPXi+UfCcbwsy6QiA7m34iiEFX0=";
-    })
   ];
 
   postPatch = ''
