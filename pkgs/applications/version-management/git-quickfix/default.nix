@@ -3,6 +3,7 @@
   fetchFromGitHub,
   libiconv,
   openssl,
+  zlib,
   pkg-config,
   rustPlatform,
   stdenv,
@@ -30,6 +31,7 @@ rustPlatform.buildRustPackage rec {
       Security
       SystemConfiguration
       libiconv
+      zlib
     ];
 
   useFetchCargoVendor = true;
