@@ -16,18 +16,21 @@
   libXcursor,
   libglvnd,
   libpulseaudio,
+  wayland-scanner,
+  libdrm,
+  wayland,
   wrapperDir ? "/run/wrappers/bin",
   gitUpdater,
 }:
 
 stdenv.mkDerivation rec {
   pname = "gpu-screen-recorder-ui";
-  version = "1.2.1";
+  version = "1.3.4";
 
   src = fetchgit {
     url = "https://repo.dec05eba.com/${pname}";
     tag = version;
-    hash = "sha256-RROgvuq6Z05M4aClEpGSI+pYhdMSTU1EXaJvmpMQgaE=";
+    hash = "sha256-8NL4Js/ok6buWOkwFoiD95mA1nWxm2KYQP+Y35zuEl8=";
   };
 
   postPatch = ''
@@ -45,6 +48,7 @@ stdenv.mkDerivation rec {
     meson
     ninja
     makeWrapper
+    wayland-scanner
   ];
 
   buildInputs = [
@@ -56,6 +60,8 @@ stdenv.mkDerivation rec {
     libXcursor
     libglvnd
     libpulseaudio
+    libdrm
+    wayland
   ];
 
   mesonFlags = [
