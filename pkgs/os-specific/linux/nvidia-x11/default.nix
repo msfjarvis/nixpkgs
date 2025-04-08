@@ -72,7 +72,7 @@ rec {
     persistencedSha256 = "sha256-OSo4Od7NmezRdGm7BLLzYseWABwNGdsomBCkOsNvOxA=";
   };
 
-  latest = selectHighestVersion production (generic {
+  latest = generic {
     version = "565.77";
     sha256_64bit = "sha256-CnqnQsRrzzTXZpgkAtF7PbH9s7wbiTRNcM0SPByzFHw=";
     sha256_aarch64 = "sha256-LSAYUnhfnK3rcuPe1dixOwAujSof19kNOfdRHE7bToE=";
@@ -88,7 +88,7 @@ rec {
       ./Use-linux-aperture.c-for-removing-conflict.patch
       ./TTM-fbdev-emulation-for-Linux-6.13.patch
     ];
-  });
+  };
 
   beta = selectHighestVersion latest (generic {
     version = "575.51.02";
