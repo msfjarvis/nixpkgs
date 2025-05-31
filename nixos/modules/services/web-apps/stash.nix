@@ -481,12 +481,16 @@ in
 
     networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [ cfg.settings.port ];
 
-    users.users.${cfg.user} = {
-      inherit (cfg) group;
-      isSystemUser = true;
-      home = cfg.dataDir;
+    users.users = mkIf (cfg.user == "stash") {
+      "${cfg.user}" = {
+        inherit (cfg) group;
+        isSystemUser = true;
+        home = cfg.dataDir;
+      };
     };
-    users.groups.${cfg.group} = { };
+    users.groups = mkIf (cfg.group == "stash") {
+      "${cfg.group}" = { };
+    };
 
     systemd = {
       tmpfiles.settings."10-stash-datadir".${cfg.dataDir}."d" = {
