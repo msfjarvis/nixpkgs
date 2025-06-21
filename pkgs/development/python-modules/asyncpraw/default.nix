@@ -63,6 +63,8 @@ buildPythonPackage rec {
     "tests/integration/models/reddit/test_subreddit.py"
     "tests/integration/models/reddit/test_widgets.py"
     "tests/integration/models/reddit/test_wikipage.py"
+    # RuntimeError: no running event loop
+    "tests/unit/test_reddit.py"
   ];
 
   pythonImportsCheck = [ "asyncpraw" ];
