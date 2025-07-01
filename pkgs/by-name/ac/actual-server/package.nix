@@ -10,13 +10,13 @@
 }:
 let
   yarn-berry = yarn-berry_4;
-  version = "25.6.1";
+  version = "25.7.1";
   src = fetchFromGitHub {
     name = "actualbudget-actual-source";
     owner = "actualbudget";
     repo = "actual";
     tag = "v${version}";
-    hash = "sha256-+6rMfFmqm7HLYMgmiG+DE2bH5WkIZxwTiy2L/CdZYEI=";
+    hash = "sha256-BXF9VL2HTNOOsX+l6G+5CHRi+ycGJTizky8cypijR7M=";
   };
   translations = fetchFromGitHub {
     name = "actualbudget-translations-source";
@@ -76,7 +76,7 @@ stdenv.mkDerivation (finalAttrs: {
   missingHashes = ./missing-hashes.json;
   offlineCache = yarn-berry.fetchYarnBerryDeps {
     inherit (finalAttrs) src missingHashes;
-    hash = "sha256-mL4rIBJsx0wSAy1hY9fC0DyGLZOnvXhkFTlxQfK0Dfc=";
+    hash = "sha256-SPLosaI2r8PshhqG+dbJktVmjcaDX1GmIXBO0bF+mY4=";
   };
 
   pname = "actual-server";
