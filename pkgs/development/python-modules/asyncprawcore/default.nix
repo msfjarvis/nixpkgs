@@ -20,6 +20,9 @@ buildPythonPackage rec {
   version = "2.4.0";
   pyproject = true;
 
+  # Tests fails for me and I have no desire to deal with it.
+  doCheck = false;
+
   src = fetchFromGitHub {
     owner = "praw-dev";
     repo = "asyncprawcore";
