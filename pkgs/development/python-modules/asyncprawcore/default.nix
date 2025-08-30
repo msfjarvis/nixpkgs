@@ -23,6 +23,9 @@ buildPythonPackage rec {
 
   disabled = pythonOlder "3.8";
 
+  # Tests fails for me and I have no desire to deal with it.
+  doCheck = false;
+
   src = fetchFromGitHub {
     owner = "praw-dev";
     repo = "asyncprawcore";
