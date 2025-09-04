@@ -17616,6 +17616,8 @@ self: super: with self; {
 
   starlink-grpc-core = callPackage ../development/python-modules/starlink-grpc-core { };
 
+  stashapi = callPackage ../development/python-modules/stashapi { };
+
   stashy = callPackage ../development/python-modules/stashy { };
 
   static3 = callPackage ../development/python-modules/static3 { };
