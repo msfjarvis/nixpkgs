@@ -379,6 +379,8 @@ in
 
       package = mkPackageOption pkgs "stash" { };
 
+      pythonPackage = mkPackageOption pkgs "python3" { };
+
       user = mkOption {
         type = types.str;
         default = "stash";
@@ -502,7 +504,7 @@ in
         after = [ "network.target" ];
         path = with pkgs; [
           ffmpeg-full
-          python3
+          cfg.pythonPackage
           ruby
         ];
         environment.STASH_CONFIG_FILE = "${cfg.dataDir}/config.yml";
