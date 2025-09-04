@@ -17990,6 +17990,8 @@ self: super: with self; {
 
   starsessions = callPackage ../development/python-modules/starsessions { };
 
+  stashapi = callPackage ../development/python-modules/stashapi { };
+
   stashy = callPackage ../development/python-modules/stashy { };
 
   static3 = callPackage ../development/python-modules/static3 { };
