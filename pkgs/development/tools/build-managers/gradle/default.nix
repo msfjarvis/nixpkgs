@@ -324,6 +324,9 @@ let
   gen' = args: callPackage (gen args) { };
 in
 rec {
+
+  inherit gen';
+
   # NOTE: Default JDKs that are hardcoded below must be LTS versions
   # and respect the compatibility matrix at
   # https://docs.gradle.org/current/userguide/compatibility.html

@@ -6555,6 +6555,8 @@ with pkgs;
   gradle_9 = gradle-packages.gradle_9.wrapped;
   gradle = gradle-packages.gradle.wrapped;
 
+  gradleGen = gradle-packages.gen';
+
   griffe = with python3Packages; toPythonApplication griffe;
 
   gwrap = g-wrap;
