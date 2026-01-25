@@ -545,7 +545,7 @@ in
           ExecStart = getExe cfg.package;
 
           ProtectHome = "tmpfs";
-          BindReadOnlyPaths = mkIf (cfg.settings != { }) (map (stash: "${stash.path}") cfg.settings.stash);
+          ReadWritePaths = mkIf (cfg.settings != { }) (map (stash: "${stash.path}") cfg.settings.stash);
 
           # hardening
 
