@@ -4,6 +4,7 @@
   buildGoModule,
   fetchFromGitHub,
   installShellFiles,
+  git,
   buildPackages,
   versionCheckHook,
   nix-update-script,
@@ -11,16 +12,16 @@
 
 buildGoModule (finalAttrs: {
   pname = "hugo";
-  version = "0.155.3";
+  version = "0.156.0";
 
   src = fetchFromGitHub {
     owner = "gohugoio";
     repo = "hugo";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-2TvzM7veSAGDqomWXHuEnYX8bGVxAxTto0Xzc+vypDY=";
+    hash = "sha256-7I6CONFpkYd3+2C5xssEmRQGJGDOc1RnlX6UDGy/JZU=";
   };
 
-  vendorHash = "sha256-Fh38o7wD6/gL4szvT4UmA4lzIStqITjgjulsIQlPmHU=";
+  vendorHash = "sha256-X1wndkxemlUis2oWc4ufdonZqgO6aQikij0rU3jZaRs=";
 
   checkFlags =
     let
@@ -44,7 +45,7 @@ buildGoModule (finalAttrs: {
 
   subPackages = [ "." ];
 
-  nativeBuildInputs = [ installShellFiles ];
+  nativeBuildInputs = [ installShellFiles git ];
 
   ldflags = [
     "-s"
