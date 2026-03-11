@@ -1,26 +1,33 @@
 {
   buildGoModule,
   fetchFromGitHub,
-  fetchYarnDeps,
+  fetchPnpmDeps,
+  git,
   lib,
   nixosTests,
   nodejs,
+  pnpm_9,
+  pnpmConfigHook,
   stash,
   stdenv,
   testers,
-  yarnBuildHook,
-  yarnConfigHook,
 }:
 let
   inherit (lib.importJSON ./version.json)
     gitHash
+    pnpmHash
     srcHash
     vendorHash
     version
-    yarnHash
     ;
 
   pname = "stash";
+
+  goModules = buildGoModule {
+    pname = "${pname}-${version}-go-modules";
+    inherit version srcHash;
+    vendorHash = vendorHash;
+  };
 in
 buildGoModule (
   finalAttrs:
@@ -30,21 +37,28 @@ buildGoModule (
       inherit (finalAttrs) version gitHash;
       src = "${finalAttrs.src}/ui/v2.5";
 
-      yarnOfflineCache = fetchYarnDeps {
-        yarnLock = "${final.src}/yarn.lock";
-        hash = finalAttrs.yarnHash;
+      pnpmDeps = fetchPnpmDeps {
+        pname = "${finalAttrs.pname}-ui";
+        inherit (finalAttrs) version;
+        src = "${finalAttrs.src}/ui/v2.5";
+        pnpm = pnpm_9;
+        fetcherVersion = 3;
+        hash = finalAttrs.pnpmHash;
+        postUnpack = ''
+          rm -f $sourceRoot/pnpm-workspace.yaml
+        '';
       };
 
       nativeBuildInputs = [
-        yarnConfigHook
-        yarnBuildHook
-        # Needed for executing package.json scripts
+        pnpmConfigHook
+        pnpm_9
         nodejs
       ];
 
       postPatch = ''
         substituteInPlace codegen.ts \
           --replace-fail "../../graphql/" "${finalAttrs.src}/graphql/"
+        rm -f pnpm-workspace.yaml
       '';
 
       buildPhase = ''
@@ -56,8 +70,8 @@ buildGoModule (
         export VITE_APP_STASH_VERSION=v${finalAttrs.version}
         export VITE_APP_NOLEGACY=true
 
-        yarn --offline run gqlgen
-        yarn --offline build
+        pnpm run gqlgen
+        pnpm build
 
         mv build $out
 
@@ -73,7 +87,8 @@ buildGoModule (
       pname
       version
       gitHash
-      yarnHash
+      pnpmHash
+      goModules
       vendorHash
       ;
 
@@ -109,6 +124,8 @@ buildGoModule (
       # remove `-trimpath` fron `GOFLAGS` because `gqlgen` does not work with it
       GOFLAGS="''${GOFLAGS/-trimpath/}" go generate ./cmd/stash
     '';
+
+    nativeBuildInputs = [ git ];
 
     strictDeps = true;
 
