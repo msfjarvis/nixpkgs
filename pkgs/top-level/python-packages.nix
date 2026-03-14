@@ -1110,6 +1110,8 @@ self: super: with self; {
 
   async-lru = callPackage ../development/python-modules/async-lru { };
 
+  async-mega-py = callPackage ../development/python-modules/async-mega-py { };
+
   async-modbus = callPackage ../development/python-modules/async-modbus { };
 
   async-stagger = callPackage ../development/python-modules/async-stagger { };
