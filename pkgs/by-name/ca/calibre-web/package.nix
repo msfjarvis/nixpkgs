@@ -4,9 +4,27 @@
   fetchFromGitHub,
   nix-update-script,
   nixosTests,
-  python3Packages,
+  python3,
 }:
-python3Packages.buildPythonApplication rec {
+let
+  py = python3 // {
+    pkgs = python3.pkgs.overrideScope (
+      final: prev: {
+        # Requires "wand<0.7"
+        wand = prev.wand.overridePythonAttrs (prev: rec {
+          version = "0.6.13";
+          format = "setuptools";
+          pyproject = null;
+          src = prev.src.override {
+            tag = version;
+            hash = "sha256-WEVExbo8jLhV5Mf3WX4YM8YPeapdtPOc3EJbpbtIq14=";
+          };
+        });
+      }
+    );
+  };
+in
+py.pkgs.buildPythonApplication rec {
   pname = "calibre-web";
   version = "0.6.26-unstable-2026-03-01";
   pyproject = true;
@@ -40,9 +58,9 @@ python3Packages.buildPythonApplication rec {
       --replace-fail 'cps = "calibreweb:main"' 'calibre-web = "calibreweb:main"'
   '';
 
-  build-system = [ python3Packages.setuptools ];
+  build-system = with py.pkgs; [ setuptools ];
 
-  dependencies = with python3Packages; [
+  dependencies = with py.pkgs; [
     apscheduler
     babel
     bleach
@@ -71,12 +89,12 @@ python3Packages.buildPythonApplication rec {
   ];
 
   optional-dependencies = {
-    comics = with python3Packages; [
+    comics = with py.pkgs; [
       comicapi
       natsort
     ];
 
-    gdrive = with python3Packages; [
+    gdrive = with py.pkgs; [
       gevent
       google-api-python-client
       greenlet
@@ -90,7 +108,7 @@ python3Packages.buildPythonApplication rec {
       uritemplate
     ];
 
-    gmail = with python3Packages; [
+    gmail = with py.pkgs; [
       google-api-python-client
       google-auth-oauthlib
     ];
@@ -99,14 +117,14 @@ python3Packages.buildPythonApplication rec {
     # archived and depends on other long unmaintained packages (rauth & nose)
     # goodreads = [ ];
 
-    kobo = with python3Packages; [ jsonschema ];
+    kobo = with py.pkgs; [ jsonschema ];
 
-    ldap = with python3Packages; [
+    ldap = with py.pkgs; [
       flask-simpleldap
       python-ldap
     ];
 
-    metadata = with python3Packages; [
+    metadata = with py.pkgs; [
       faust-cchardet
       html2text
       markdown2
@@ -118,7 +136,7 @@ python3Packages.buildPythonApplication rec {
       scholarly
     ];
 
-    oauth = with python3Packages; [
+    oauth = with py.pkgs; [
       flask-dance
       sqlalchemy-utils
     ];
