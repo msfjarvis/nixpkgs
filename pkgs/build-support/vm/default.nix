@@ -27,6 +27,7 @@
 
   # ----------------------------
   # The following  arguments form the "interface" of `pkgs.vmTools`.
+  # Note that `img` is a real package, but is set to this default in `all-packages.nix`.
   # ----------------------------
   customQemu ? null,
   kernel ? linux,
