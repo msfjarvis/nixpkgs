@@ -1,0 +1,254 @@
+name: Rebase upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: write
+
+# Serialize publication across runs so a slower job can never replace a newer
+# latest manifest, and never cancel an in-flight publication mid-write.
+concurrency:
+  group: nixpkgs-tarball-publication
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: "nixpkgs-unstable"
+            upstream: "nixpkgs-unstable"
+          - target: "master"
+            upstream: "master"
+
+    steps:
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .git
+          key: ${{ matrix.target }}-git-${{ hashFiles('.git') }}
+          restore-keys: |
+            ${{ matrix.target }}-git-
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ matrix.target }}
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN_FOR_UPDATES }}
+          # Needed to push the rebased branch back to origin.
+          persist-credentials: true
+
+      - name: git setup
+        run: |
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: fetch upstream
+        run: |
+          # might already be there if the cache was used
+          git remote add upstream https://github.com/NixOS/nixpkgs.git || true
+          git fetch --no-tags --prune --no-recurse-submodules --depth 2000 upstream ${{ matrix.upstream }}
+
+      - name: rebase
+        run: |
+          git rebase upstream/${{ matrix.upstream }}
+
+      - name: push
+        run: |
+          git push --force-with-lease origin ${{ matrix.target }}
+
+      - name: collect garbage
+        run: |
+          git gc
+
+      # Publish the channel tarball built from the freshly rebased tree as a
+      # write-once R2 snapshot, then advance the mutable publication served by
+      # the nix-channels Worker:
+      #   inputs.nixpkgs.url = "https://nix-channels.msfjarvis.dev/nixpkgs/latest.tar.zst";
+      # Only the nixpkgs-unstable matrix entry is published, so the two entries
+      # don't race to publish different trees.
+      #
+      # Repository configuration:
+      #   Secrets:   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+      #   Variables: S3_BUCKET
+      #              S3_ENDPOINT_URL - S3-compatible endpoint, e.g. Cloudflare
+      #                R2: https://<account-id>.r2.cloudflarestorage.com
+      #              AWS_REGION      - use `auto` for R2
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        if: matrix.target == 'nixpkgs-unstable'
+        with:
+          # Match the sandboxing used by the rest of Nixpkgs CI.
+          extra_nix_config: sandbox = true
+
+      - name: Build channel tarball
+        if: matrix.target == 'nixpkgs-unstable'
+        run: nix-build ./ci -A tarball -o result
+
+      - name: Publish snapshot and advance latest
+        if: matrix.target == 'nixpkgs-unstable'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_EC2_METADATA_DISABLED: "true"
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_ENDPOINT_URL: ${{ vars.S3_ENDPOINT_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${S3_BUCKET:-}" ]; then
+            echo "::error::The S3_BUCKET repository variable is not set."
+            exit 1
+          fi
+
+          # An empty AWS_REGION must be treated as unset, not as an invalid
+          # region; the CLI then falls back to the bucket's own region.
+          if [ -z "${AWS_REGION:-}" ]; then
+            unset AWS_REGION
+          fi
+
+          # Talk to an S3-compatible endpoint (Cloudflare R2, MinIO, ...) when
+          # one is configured; otherwise the CLI targets AWS S3 as usual.
+          endpoint_args=()
+          if [ -n "${S3_ENDPOINT_URL:-}" ]; then
+            endpoint_args+=(--endpoint-url "$S3_ENDPOINT_URL")
+          fi
+
+          # The `.tar.zst` tarball is one of two artifacts the target emits; the
+          # `.tar.xz` sibling is ignored.
+          shopt -s nullglob
+          tarballs=(result/tarballs/*.tar.zst)
+          if [ "${#tarballs[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one .tar.zst tarball, found ${#tarballs[@]}."
+            exit 1
+          fi
+          tarball="${tarballs[0]}"
+
+          # Integrity data for the snapshot. `nix flake prefetch` unpacks the
+          # archive the same way the Nix tarball fetcher does, so its reported
+          # NAR hash is what a client later verifies against `flake.lock`.
+          archive_sha256=$(sha256sum "$tarball" | cut -d' ' -f1)
+          content_length=$(stat -c%s "$tarball")
+          prefetch=$(nix --extra-experimental-features 'nix-command flakes' \
+            flake prefetch --json "file://$(realpath "$tarball")")
+          nar_hash=$(jq -r '.locked.narHash // empty' <<<"$prefetch")
+          if [ -z "$nar_hash" ]; then
+            echo "::error::nix flake prefetch did not report a NAR hash for $tarball."
+            exit 1
+          fi
+          last_modified=$(jq -r '.locked.lastModified // empty' <<<"$prefetch")
+          if [ -z "$last_modified" ]; then
+            echo "::error::nix flake prefetch did not report lastModified for $tarball."
+            exit 1
+          fi
+
+          # Snapshot identity is the URL-encoded SRI NAR hash. SRI SHA-256 uses
+          # the standard base64 alphabet, so only `/`, `+`, and `=` need escaping.
+          encoded_nar_hash=${nar_hash//\//%2F}
+          encoded_nar_hash=${encoded_nar_hash//+/%2B}
+          encoded_nar_hash=${encoded_nar_hash//=/%3D}
+          object_key="snapshots/${encoded_nar_hash}.tar.zst"
+
+          rev=$(git rev-parse HEAD)
+          rev_count=$(git rev-list --count HEAD)
+          published_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          metadata=$(jq -nc \
+            --arg archiveSha256 "$archive_sha256" \
+            --arg narHash "$nar_hash" \
+            --arg rev "$rev" \
+            --arg revCount "$rev_count" \
+            --arg lastModified "$last_modified" \
+            '{
+              "archive-sha256": $archiveSha256,
+              "nar-hash": $narHash,
+              "rev": $rev,
+              "rev-count": $revCount,
+              "last-modified": $lastModified
+            }')
+
+          # Only an explicit 404 means the snapshot is absent. Any other
+          # failure (network, auth, throttling) must abort rather than fall
+          # through to an upload that could overwrite an existing object.
+          head_error=$(mktemp)
+          if existing=$(aws s3api head-object \
+              --bucket "$S3_BUCKET" \
+              --key "$object_key" \
+              "${endpoint_args[@]}" 2>"$head_error"); then
+            stored_sha=$(jq -r '.Metadata["archive-sha256"] // empty' <<<"$existing")
+            if [ "$stored_sha" != "$archive_sha256" ]; then
+              echo "::error::Snapshot s3://${S3_BUCKET}/${object_key} already exists with archive digest ${stored_sha:-<none>}, expected ${archive_sha256}; refusing to overwrite."
+              exit 1
+            fi
+            echo "Reusing existing snapshot s3://${S3_BUCKET}/${object_key} (archive digest matches)."
+          elif grep -qE '404|Not Found|NoSuchKey' "$head_error"; then
+            echo "Uploading snapshot to s3://${S3_BUCKET}/${object_key}"
+            aws s3api put-object \
+              --bucket "$S3_BUCKET" \
+              --key "$object_key" \
+              --body "$tarball" \
+              --content-type application/zstd \
+              --metadata "$metadata" \
+              "${endpoint_args[@]}"
+
+            # Verify the stored object before it can be named by the manifest.
+            stored=$(aws s3api head-object \
+              --bucket "$S3_BUCKET" \
+              --key "$object_key" \
+              "${endpoint_args[@]}")
+            stored_length=$(jq -r '.ContentLength' <<<"$stored")
+            stored_sha=$(jq -r '.Metadata["archive-sha256"] // empty' <<<"$stored")
+            stored_nar=$(jq -r '.Metadata["nar-hash"] // empty' <<<"$stored")
+            stored_type=$(jq -r '.ContentType // empty' <<<"$stored")
+            if [ "$stored_length" != "$content_length" ] ||
+              [ "$stored_sha" != "$archive_sha256" ] ||
+              [ "$stored_nar" != "$nar_hash" ] ||
+              [ "$stored_type" != "application/zstd" ]; then
+              echo "::error::Uploaded snapshot failed verification; leaving the latest manifest unchanged."
+              exit 1
+            fi
+          else
+            echo "::error::Could not determine whether s3://${S3_BUCKET}/${object_key} exists; refusing to publish."
+            cat "$head_error" >&2
+            exit 1
+          fi
+          rm -f "$head_error"
+
+          # Only now, with a verified write-once object, advance the mutable
+          # publication. Any earlier failure leaves the previous manifest active.
+          manifest=$(jq -nc \
+            --arg objectKey "$object_key" \
+            --arg archiveSha256 "$archive_sha256" \
+            --arg narHash "$nar_hash" \
+            --arg rev "$rev" \
+            --arg revCount "$rev_count" \
+            --arg lastModified "$last_modified" \
+            --argjson contentLength "$content_length" \
+            --arg publishedAt "$published_at" \
+            '{
+              schemaVersion: 1,
+              objectKey: $objectKey,
+              archiveSha256: $archiveSha256,
+              narHash: $narHash,
+              rev: $rev,
+              revCount: ($revCount | tonumber),
+              lastModified: ($lastModified | tonumber),
+              contentLength: $contentLength,
+              publishedAt: $publishedAt
+            }')
+
+          manifest_file=$(mktemp)
+          trap 'rm -f "$manifest_file"' EXIT
+          printf '%s\n' "$manifest" > "$manifest_file"
+          echo "Advancing latest manifest to ${object_key}"
+          aws s3api put-object \
+            --bucket "$S3_BUCKET" \
+            --key "manifests/nixpkgs-latest.json" \
+            --body "$manifest_file" \
+            --content-type application/json \
+            "${endpoint_args[@]}"
