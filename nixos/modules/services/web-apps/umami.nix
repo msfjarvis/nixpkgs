@@ -244,10 +244,17 @@ in
           loadCredentials =
             (optional (
               cfg.settings.APP_SECRET_FILE != null
-            ) ''export APP_SECRET="$(systemd-creds cat appSecret)"'')
-            ++ (optional (
+            ) ''
+                APP_SECRET="$(systemd-creds cat appSecret)"
+                export APP_SECRET
+              ''
+            ) ++ (optional (
               cfg.settings.DATABASE_URL_FILE != null
-            ) ''export DATABASE_URL="$(systemd-creds cat databaseUrl)"'');
+            ) ''
+                DATABASE_URL="$(systemd-creds cat databaseUrl)"
+                export DATABASE_URL
+              ''
+            );
         in
         ''
           ${concatStringsSep "\n" loadCredentials}
